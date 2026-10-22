@@ -165,3 +165,35 @@ streamlit run app.py
    * **Password**: `NewPassword@123`
 5. Select the 8 base tables (or the 7 pre-built views from `analytics_views.sql`) and click **Load**.
 6. Build or verify the visuals as outlined in [powerbi_dax_and_model_guide.md](file:///c:/Users/karth/Desktop/proj/powerbi/powerbi_dax_and_model_guide.md) and save the report as `powerbi/olist_analytics.pbix`.
+
+---
+
+## 6. Cloud Hosting Guide (Free Public Deployment)
+
+The project includes an automatic dual-engine data loader in `app.py`:
+* **Local Mode**: Automatically queries MySQL `olist_analytics` if running.
+* **Cloud Mode**: Gracefully falls back to reading the cleaned datasets from `data/processed/` when a MySQL server is not detected, enabling zero-configuration cloud hosting.
+
+### Option A: Deploy on Render.com (Free Web Service)
+1. Push this repository to GitHub.
+2. Sign in to **[dashboard.render.com](https://dashboard.render.com)**.
+3. Click **New +** &rarr; **Web Service** &rarr; connect repository `karthiktatineni/data`.
+4. Configure the service settings:
+   * **Name**: `olist-analytics-dashboard`
+   * **Environment**: `Python 3`
+   * **Branch**: `main` (or `streamlit-cloud`)
+   * **Build Command**: `pip install -r requirements.txt`
+   * **Start Command**: `streamlit run app.py --server.port $PORT --server.address 0.0.0.0`
+5. Click **Deploy Web Service**. Render will publish your dashboard with a free `onrender.com` URL.
+
+*(Note: Render blueprint configuration is also provided in `render.yaml`).*
+
+### Option B: Deploy on Streamlit Community Cloud (Recommended)
+1. Go to **[share.streamlit.io](https://share.streamlit.io)** and sign in with GitHub.
+2. Click **Create app** &rarr; **Yup, I have an app**.
+3. Fill in:
+   * **Repository**: `karthiktatineni/data`
+   * **Branch**: `streamlit-cloud` (or `main`)
+   * **Main file path**: `app.py`
+4. Click **Deploy!** Your app will be live at `https://<your-custom-name>.streamlit.app`.
+
