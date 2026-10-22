@@ -5,15 +5,9 @@ Streamlit live interactive dashboard matching the 3 Power BI report pages:
 - Page 1: Executive Overview
 - Page 2: Sales & Product Performance
 - Page 3: Orders, Delivery & Customer Insights
-
-Dual Data Source Engine:
-- Connects to local or remote MySQL `olist_analytics` if available.
-- Gracefully falls back to `data/processed/*.csv` for cloud deployment 
-  (Streamlit Cloud, Render, Hugging Face) with zero setup.
 """
 
 import os
-from pathlib import Path
 from urllib.parse import quote_plus
 import streamlit as st
 import pandas as pd
@@ -76,7 +70,7 @@ def get_db_engine():
     url = f"mysql+pymysql://{db_user}:{encoded_pass}@{db_host}:{db_port}/{db_name}?charset=utf8mb4"
     return create_engine(url, connect_args={"connect_timeout": 3})
 
-@st.cache_data(ttl=3600)
+@st.cache_data(show_spinner="⏳ Connecting to database & loading datasets, please wait...", ttl=3600)
 def load_all_data():
     data_source = "MySQL Database"
     try:
@@ -123,13 +117,15 @@ def load_all_data():
     
     return orders, order_items, payments, customers, products, sellers, data_source
 
-orders_df, order_items_df, payments_df, customers_df, products_df, sellers_df, source_mode = load_all_data()
+# Prominent loader on initial start
+with st.spinner("⏳ Loading Olist analytics data, please wait..."):
+    orders_df, order_items_df, payments_df, customers_df, products_df, sellers_df, source_mode = load_all_data()
 
 # ==========================================
 # Navigation Sidebar
 # ==========================================
 st.sidebar.title("🛒 Olist Analytics")
-st.sidebar.caption(f"Engine: **{source_mode}**")
+st.sidebar.caption(f"Data Source: **{source_mode}**")
 page = st.sidebar.radio(
     "Select Report Page:",
     [
@@ -150,9 +146,8 @@ if page == "Page 1: Executive Overview":
 
     # Sidebar Slicers
     st.sidebar.subheader("Page Filters")
-    valid_dates = orders_df["purchase_date"].dropna()
-    min_date = valid_dates.min()
-    max_date = valid_dates.max()
+    min_date = orders_df["purchase_date"].min()
+    max_date = orders_df["purchase_date"].max()
     date_range = st.sidebar.date_input("Order Date Range", [min_date, max_date])
     
     status_options = ["All"] + sorted(orders_df["order_status"].dropna().unique().tolist())
@@ -326,7 +321,7 @@ else:
     if sel_state != "All":
         filt_orders = filt_orders[filt_orders["customer_state"] == sel_state]
 
-    # 4 Top KPI Cards
+    # 3 Top KPI Cards
     delivered_count = (filt_orders["order_status"] == "delivered").sum()
     cancelled_count = (filt_orders["order_status"] == "canceled").sum()
     
