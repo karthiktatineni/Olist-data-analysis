@@ -56,7 +56,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# Database Connection
+# Dual-Mode Data Engine (MySQL + CSV Fallback)
 # ==========================================
 @st.cache_resource
 def get_db_engine():
@@ -68,23 +68,37 @@ def get_db_engine():
     
     encoded_pass = quote_plus(db_pass)
     url = f"mysql+pymysql://{db_user}:{encoded_pass}@{db_host}:{db_port}/{db_name}?charset=utf8mb4"
-    return create_engine(url)
+    return create_engine(url, connect_args={"connect_timeout": 3})
 
-@st.cache_data(ttl=3600)
+@st.cache_data(show_spinner="⏳ Connecting to database & loading datasets, please wait...", ttl=3600)
 def load_all_data():
-    engine = get_db_engine()
-    with engine.connect() as conn:
-        orders = pd.read_sql("SELECT * FROM orders", conn)
-        order_items = pd.read_sql("SELECT * FROM order_items", conn)
-        payments = pd.read_sql("SELECT * FROM payments", conn)
-        customers = pd.read_sql("SELECT * FROM customers", conn)
-        products = pd.read_sql("SELECT * FROM products", conn)
-        cat_trans = pd.read_sql("SELECT * FROM category_translation", conn)
-        sellers = pd.read_sql("SELECT * FROM sellers", conn)
+    data_source = "MySQL Database"
+    try:
+        engine = get_db_engine()
+        with engine.connect() as conn:
+            orders = pd.read_sql("SELECT * FROM orders", conn)
+            order_items = pd.read_sql("SELECT * FROM order_items", conn)
+            payments = pd.read_sql("SELECT * FROM payments", conn)
+            customers = pd.read_sql("SELECT * FROM customers", conn)
+            products = pd.read_sql("SELECT * FROM products", conn)
+            cat_trans = pd.read_sql("SELECT * FROM category_translation", conn)
+            sellers = pd.read_sql("SELECT * FROM sellers", conn)
+    except Exception:
+        # Fallback to direct processed CSV files (for cloud hosting: Render, Streamlit Cloud)
+        data_source = "Direct Processed CSVs"
+        proc_dir = Path("data/processed")
+        orders = pd.read_csv(proc_dir / "orders.csv")
+        order_items = pd.read_csv(proc_dir / "order_items.csv")
+        payments = pd.read_csv(proc_dir / "payments.csv")
+        customers = pd.read_csv(proc_dir / "customers.csv")
+        products = pd.read_csv(proc_dir / "products.csv")
+        cat_trans = pd.read_csv(proc_dir / "category_translation.csv")
+        sellers = pd.read_csv(proc_dir / "sellers.csv")
     
     # Datetime conversions
     for col in ["order_purchase_timestamp", "order_approved_at", "order_delivered_carrier_date", "order_delivered_customer_date", "order_estimated_delivery_date"]:
-        orders[col] = pd.to_datetime(orders[col])
+        if col in orders.columns:
+            orders[col] = pd.to_datetime(orders[col], errors="coerce")
     
     orders["purchase_year_month"] = orders["order_purchase_timestamp"].dt.strftime("%Y-%m")
     orders["purchase_date"] = orders["order_purchase_timestamp"].dt.date
@@ -96,18 +110,22 @@ def load_all_data():
     orders["is_on_time"] = (orders["order_status"] == "delivered") & (orders["order_delivered_customer_date"] <= orders["order_estimated_delivery_date"])
     
     # Merge category translation with products
-    products = products.merge(cat_trans, on="product_category_name", how="left")
+    if "product_category_name_english" not in products.columns:
+        products = products.merge(cat_trans, on="product_category_name", how="left")
+    
     products["category_name"] = products["product_category_name_english"].fillna(products["product_category_name"]).fillna("Uncategorized")
     
-    return orders, order_items, payments, customers, products, sellers
+    return orders, order_items, payments, customers, products, sellers, data_source
 
-orders_df, order_items_df, payments_df, customers_df, products_df, sellers_df = load_all_data()
+# Prominent loader on initial start
+with st.spinner("⏳ Loading Olist analytics data, please wait..."):
+    orders_df, order_items_df, payments_df, customers_df, products_df, sellers_df, source_mode = load_all_data()
 
 # ==========================================
 # Navigation Sidebar
 # ==========================================
 st.sidebar.title("🛒 Olist Analytics")
-st.sidebar.caption("E-Commerce Performance Insights")
+st.sidebar.caption(f"Data Source: **{source_mode}**")
 page = st.sidebar.radio(
     "Select Report Page:",
     [
