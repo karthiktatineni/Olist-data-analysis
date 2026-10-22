@@ -117,9 +117,25 @@ def load_all_data():
     
     return orders, order_items, payments, customers, products, sellers, data_source
 
-# Prominent loader on initial start
-with st.spinner("⏳ Loading Olist analytics data, please wait..."):
-    orders_df, order_items_df, payments_df, customers_df, products_df, sellers_df, source_mode = load_all_data()
+# Centered Animated Spinner & Loader
+loader_placeholder = st.empty()
+with loader_placeholder.container():
+    st.markdown("""
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px;">
+        <div style="border: 5px solid #E2E8F0; border-top: 5px solid #2563EB; border-radius: 50%; width: 55px; height: 55px; animation: olistSpin 1s linear infinite;"></div>
+        <h4 style="margin-top: 20px; font-weight: 600; color: #0F172A; letter-spacing: -0.3px;">Loading Olist E-Commerce Datasets...</h4>
+        <p style="color: #64748B; font-size: 14px; margin-top: -6px;">Preparing analytics dashboards and metric cards. Please wait...</p>
+    </div>
+    <style>
+        @keyframes olistSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+orders_df, order_items_df, payments_df, customers_df, products_df, sellers_df, source_mode = load_all_data()
+loader_placeholder.empty()
 
 # ==========================================
 # Navigation Sidebar
